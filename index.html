@@ -343,39 +343,6 @@
         <div class="grid-container" id="grid-mount"></div>
     </div>
 
-    <script>
-        // Base64 encoding of hamstervideoilhaformosa
-        const PASS_B64 = "aGFtc3RlcnZpZGVvaWxoYWZvcm1vc2E=";
-        const STORAGE_PREFIX = "htak_cam_url_";
-
-        function togglePassVisibility() {
-            const input = document.getElementById("pass-input");
-            input.type = input.type === "password" ? "text" : "password";
-        }
-
-        function verifyAuth() {
-            const input = document.getElementById("pass-input");
-            const errorMsg = document.getElementById("auth-error-msg");
-            const val = input.value.trim();
-
-            try {
-                if (window.btoa(val) === PASS_B64) {
-                    sessionStorage.setItem("htak_auth", "true");
-                    unlockConsole();
-                    return;
-                }
-            } catch (e) {}
-
-            errorMsg.innerText = "ACCESS DENIED: Invalid Passcode!";
-            input.value = "";
-            input.focus();
-        }
-
-        function unlockConsole() {
-            document.getElementById("auth-overlay").style.display = "none";
-            document.getElementById("main-content").style.display = "block";
-            initGrid();
-        }
 
         // 1. Lock Console with Confirmation Dialog
         function lockConsole() {
