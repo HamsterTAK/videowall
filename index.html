@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HamsterTAK Video Monitor Wall</title>
+    <title>Video Monitor Wall</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100%22><text y=%22.9em%22 font-size=%2290%22>🐹</text></svg>">
-    <!-- Load mpegts.js for HTTP-FLV hardware decoding -->
+    <!-- 載入 mpegts.js 支援公部門 CCTV HTTP-FLV 裸串流直接硬解播放 -->
     <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
     <style>
         * {
@@ -20,99 +20,9 @@
             padding: 10px;
             overflow-y: auto;
         }
-
-        /* 🔐 Tactical Auth Overlay */
-        #auth-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #090a0f;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 99999;
-        }
-        .lock-box {
-            background: #181b22;
-            border: 1px solid #2a2e39;
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
-            padding: 30px;
-            border-radius: 8px;
-            text-align: center;
-            max-width: 360px;
-            width: 90%;
-        }
-        .lock-box h2 {
-            font-size: 16px;
-            color: #00ffcc;
-            letter-spacing: 2px;
-            margin-bottom: 20px;
-        }
-        .input-group {
-            position: relative;
-            width: 100%;
-            margin-bottom: 15px;
-        }
-        .lock-input {
-            width: 100%;
-            background: #0f1115;
-            border: 1px solid #3a3f4d;
-            color: #00ffcc;
-            padding: 10px 36px 10px 10px;
-            font-size: 14px;
-            border-radius: 4px;
-            outline: none;
-            text-align: center;
-        }
-        .lock-input:focus {
-            border-color: #00ffcc;
-        }
-        .toggle-eye {
-            position: absolute;
-            right: 8px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #888;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .lock-btn {
-            width: 100%;
-            background: #2a2e39;
-            color: #00ffcc;
-            border: 1px solid #00ffcc;
-            padding: 9px;
-            font-size: 13px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s;
-            letter-spacing: 1px;
-        }
-        .lock-btn:hover {
-            background: #00ffcc;
-            color: #000;
-        }
-        .auth-error {
-            color: #ff5555;
-            font-size: 11px;
-            margin-top: 10px;
-            min-height: 16px;
-        }
-
-        /* Main Monitor Content (Hidden by default) */
-        #main-content {
-            display: none;
-        }
-
         header {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: wrap; /* 手機上自動折行 */
             justify-content: space-between;
             align-items: center;
             gap: 10px;
@@ -161,24 +71,8 @@
             background: #00ffcc;
             color: #000;
         }
-        .btn-lock {
-            background: #3a2a2e;
-            color: #ffaa88;
-        }
-        .btn-lock:hover {
-            background: #ff6644;
-            color: #fff;
-        }
-        .btn-danger {
-            background: #4a1c24;
-            color: #ff6666;
-            border: 1px solid #6b2631;
-        }
-        .btn-danger:hover {
-            background: #ff3333;
-            color: #fff;
-        }
         
+        /* 預設：電腦與桌上型大螢幕 (保持 3 欄) */
         .grid-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -193,9 +87,10 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            height: 300px;
+            height: 300px; /* 電腦版固定高度 */
         }
 
+        /* 頂部控制與 URL 輸入列 */
         .control-bar {
             display: flex;
             align-items: center;
@@ -216,7 +111,7 @@
         }
         .url-input {
             flex: 1;
-            min-width: 0;
+            min-width: 0; /* 避免 flex 子元素被文字撐破 */
             background: #0f1115;
             border: 1px solid #3a3f4d;
             color: #00ffcc;
@@ -252,6 +147,7 @@
             color: #fff;
         }
 
+        /* 畫面區域 (同時支援 iframe 與原生 FLV video) */
         .iframe-wrapper {
             flex: 1;
             width: 100%;
@@ -282,16 +178,17 @@
             font-family: monospace;
         }
 
+        /* 📱 響應式手機/窄螢幕視圖 (寬度小於 768px 時觸發) */
         @media (max-width: 768px) {
             .grid-container {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr; /* 改為單欄顯示 */
                 gap: 15px;
             }
             .grid-item {
-                height: auto;
+                height: auto; /* 高度隨畫面彈性伸縮 */
             }
             .iframe-wrapper {
-                aspect-ratio: 16 / 9;
+                aspect-ratio: 16 / 9; /* 強制保持 16:9 影音標準比例 */
                 height: auto;
             }
             h1 {
@@ -310,68 +207,27 @@
 </head>
 <body>
 
-    <!-- 🔐 Tactical Auth Overlay -->
-    <div id="auth-overlay">
-        <div class="lock-box">
-            <h2>🐹 HamsterTAK VIDEO WALL</h2>
-            <div class="input-group">
-                <input type="password" id="pass-input" class="lock-input" placeholder="Enter Access Passcode..." autofocus>
-                <button type="button" class="toggle-eye" onclick="togglePassVisibility()" title="Show/Hide Passcode">👁️</button>
+    <header>
+        <h1>HamsterTAK VIDEO MONITOR WALL</h1>
+        <div class="status">
+            <span>WEBRTC + FLV MODE</span>
+            <div class="server-box">
+                <span>HamsterTAK:</span>
+                <code id="base-url-text">http://129.225.167.253:8889/</code>
+                <button class="action-btn" id="copy-btn" onclick="copyBaseUrl()">📋 Copy</button>
             </div>
-            <button class="lock-btn" onclick="verifyAuth()">UNLOCK CONSOLE</button>
-            <div id="auth-error-msg" class="auth-error"></div>
+            <button class="action-btn" id="fullscreen-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
         </div>
-    </div>
+    </header>
 
-    <!-- 🖥️ Video Wall Main Content -->
-    <div id="main-content">
-        <header>
-            <h1>HamsterTAK VIDEO MONITOR WALL</h1>
-            <div class="status">
-                <span>WEBRTC + FLV MODE</span>
-                <div class="server-box">
-                    <span>HamsterTAK:</span>
-                    <code id="base-url-text">http://hamstertak/</code>
-                    <button class="action-btn" id="copy-btn" onclick="copyBaseUrl()">📋 Copy</button>
-                </div>
-                <button class="action-btn" id="fullscreen-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
-                <button class="action-btn btn-lock" onclick="lockConsole()">🔒 Lock</button>
-                <button class="action-btn btn-danger" onclick="clearAllStreams()">🗑️ Clear All</button>
-            </div>
-        </header>
-
-        <div class="grid-container" id="grid-mount"></div>
-    </div>
-
-
-        // 1. Lock Console with Confirmation Dialog
-        function lockConsole() {
-            if (confirm("⚠️ Are you sure you want to lock the Video Monitor Wall?\n(Your saved CAM links will be preserved for next unlock.)")) {
-                sessionStorage.removeItem("htak_auth");
-                location.reload();
-            }
-        }
-
-        document.getElementById("pass-input").addEventListener("keydown", (e) => {
-            if (e.key === "Enter") verifyAuth();
-        });
-
-        window.addEventListener("DOMContentLoaded", () => {
-            if (sessionStorage.getItem("htak_auth") === "true") {
-                unlockConsole();
-            }
-        });
-
-        // Dynamically generate 15 monitor windows and restore saved URLs
-        let gridInitialized = false;
-        function initGrid() {
-            if (gridInitialized) return;
-            gridInitialized = true;
-            const container = document.getElementById("grid-mount");
-            let html = "";
+    <div class="grid-container">
+        <script>
+            const DEFAULT_BASE = "http://129.225.167.253:8889/";
+            
+            // 動態生成 15 個監控視窗
             for (let i = 1; i <= 15; i++) {
                 const padId = String(i).padStart(2, '0');
-                html += `
+                document.write(`
                     <div class="grid-item">
                         <div class="control-bar">
                             <div class="tag">CAM ${padId}</div>
@@ -380,42 +236,17 @@
                             <button class="btn btn-clear" onclick="clearStream(${i})">Clear</button>
                         </div>
                         <div class="iframe-wrapper" id="wrapper-${i}">
+                            <!-- 預設待機保持乾淨黑畫面 -->
                             <iframe src="about:blank" allow="autoplay; fullscreen"></iframe>
                         </div>
                     </div>
-                `;
+                `);
             }
-            container.innerHTML = html;
+        </script>
+    </div>
 
-            // Bind events & restore from localStorage
-            for (let i = 1; i <= 15; i++) {
-                const inputEl = document.getElementById(`input-${i}`);
-                const savedVal = localStorage.getItem(STORAGE_PREFIX + i);
-
-                if (savedVal) {
-                    inputEl.value = savedVal;
-                    updateStream(i);
-                }
-
-                // Auto-save whenever user types or pastes into the input box
-                inputEl.addEventListener('input', function () {
-                    const currentVal = this.value.trim();
-                    if (currentVal) {
-                        localStorage.setItem(STORAGE_PREFIX + i, currentVal);
-                    } else {
-                        localStorage.removeItem(STORAGE_PREFIX + i);
-                    }
-                });
-
-                inputEl.addEventListener('keydown', function (e) {
-                    if (e.key === 'Enter') {
-                        updateStream(i);
-                    }
-                });
-            }
-        }
-
-        const DEFAULT_BASE = "http://";
+    <script>
+        // 儲存每一格的 mpegts.js 播放器實例，確保切換或清除時能徹底釋放記憶體與連線
         const flvPlayers = {};
 
         function destroyFlvPlayer(index) {
@@ -430,8 +261,9 @@
             }
         }
 
+        // 一鍵複製 Base URL
         function copyBaseUrl() {
-            const baseUrl = "http://";
+            const baseUrl = "http://129.225.167.253:8889/";
             navigator.clipboard.writeText(baseUrl).then(() => {
                 const btn = document.getElementById("copy-btn");
                 btn.innerText = "✓ Copied!";
@@ -445,13 +277,14 @@
             });
         }
 
+        // 全螢幕切換按鈕
         function toggleFullscreen() {
             const btn = document.getElementById("fullscreen-btn");
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().then(() => {
                     btn.innerText = "❌ Exit Fullscreen";
                 }).catch(err => {
-                    alert(`Failed to enter fullscreen mode: ${err.message}`);
+                    alert(`無法切換至全螢幕模式: ${err.message}`);
                 });
             } else {
                 if (document.exitFullscreen) {
@@ -462,6 +295,7 @@
             }
         }
 
+        // 監聽 Esc 或系統關閉全螢幕事件，同步更新按鈕文字
         document.addEventListener("fullscreenchange", () => {
             const btn = document.getElementById("fullscreen-btn");
             if (!document.fullscreenElement) {
@@ -471,18 +305,13 @@
             }
         });
 
+        // 載入串流邏輯 (自動判斷 WebRTC iframe 或 HTTP-FLV 原生硬解)
         function updateStream(index) {
             const input = document.getElementById(`input-${index}`);
             const wrapper = document.getElementById(`wrapper-${index}`);
             let val = input.value.trim();
 
-            // 2. Save or remove URL in localStorage
-            if (val) {
-                localStorage.setItem(STORAGE_PREFIX + index, val);
-            } else {
-                localStorage.removeItem(STORAGE_PREFIX + index);
-            }
-
+            // 1. 先徹底銷毀該格可能存在的舊 FLV 播放器實例並清空 DOM
             destroyFlvPlayer(index);
             wrapper.innerHTML = '';
 
@@ -493,19 +322,24 @@
 
             let targetUrl = "";
             if (/^https?:\/\//i.test(val)) {
+                // 自動將開頭大寫的 Https:// 正規化為標準 https://
                 targetUrl = val.replace(/^https?:\/\//i, m => m.toLowerCase());
             } else if (/^(udp|rtsp|rtmp):\/\//i.test(val)) {
+                // 自動轉碼帶入 MediaMTX all_others 動態代理
                 const encodedSource = encodeURIComponent(val);
                 targetUrl = DEFAULT_BASE + encodedSource;
             } else {
+                // 輸入簡易 Path (如 neoyangminidrone) 時自動拼上根目錄
                 const cleanPath = val.replace(/^\/+/, '');
                 targetUrl = DEFAULT_BASE + cleanPath;
             }
 
+            // 判斷是否為公部門 CCTV 常見的 HTTP-FLV 裸串流 (含 /flv/ 或 .flv)
             const isFlvStream = /\/flv\/|\.flv($|\?)/i.test(targetUrl);
 
             setTimeout(() => {
                 if (isFlvStream) {
+                    // 使用 mpegts.js 直接在該監控格內硬解播放 FLV，防止觸發瀏覽器檔案下載！
                     wrapper.innerHTML = `
                         <video id="video-${index}" autoplay muted controls playsinline></video>
                         <div class="flv-overlay-msg" id="msg-${index}">⏳ Decoding FLV...</div>
@@ -524,7 +358,7 @@
                         player.play().then(() => {
                             if (msgEl) msgEl.style.display = 'none';
                         }).catch(() => {
-                            if (msgEl) msgEl.innerText = '▶️ Click video to start playback';
+                            if (msgEl) msgEl.innerText = '▶️ 請點擊畫面開始播放';
                         });
                         videoEl.addEventListener('playing', () => {
                             if (msgEl) msgEl.style.display = 'none';
@@ -532,34 +366,34 @@
                         player.on(mpegts.Events.ERROR, (errType) => {
                             if (msgEl) {
                                 msgEl.style.display = 'block';
-                                msgEl.innerHTML = `⚠️ FLV Stream Offline or Blocked by CORS (${errType})`;
+                                msgEl.innerHTML = `⚠️ FLV 串流離線或遭 CORS 阻擋 (${errType})`;
                             }
                         });
                     } else if (msgEl) {
-                        msgEl.innerText = '❌ Browser does not support MSE/FLV decoding';
+                        msgEl.innerText = '❌ 瀏覽器不支援 MSE/FLV 解碼';
                     }
                 } else {
+                    // 一般 WebRTC 或網頁連結維持 iframe 載入
                     wrapper.innerHTML = `<iframe src="${targetUrl}" allow="autoplay; fullscreen"></iframe>`;
                 }
             }, 100);
         }
 
-        // Single CAM Clear (also clears saved localStorage for this CAM)
+        // 一鍵清除輸入內容並重置畫面
         function clearStream(index) {
             const input = document.getElementById(`input-${index}`);
-            input.value = "";
-            localStorage.removeItem(STORAGE_PREFIX + index);
-            updateStream(index);
+            input.value = ""; // 清空輸入框
+            updateStream(index); // 銷毀播放器並重置回預設待機黑畫面
         }
 
-        // 3. Clear All Streams with Confirmation Dialog
-        function clearAllStreams() {
-            if (confirm("⚠️ Are you sure you want to CLEAR ALL 15 camera streams?\nThis will remove all saved links and stop all active feeds.")) {
-                for (let i = 1; i <= 15; i++) {
-                    clearStream(i);
+        // 支援按 Enter 鍵直接切換畫面
+        document.querySelectorAll('.url-input').forEach((inputEl, idx) => {
+            inputEl.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    updateStream(idx + 1);
                 }
-            }
-        }
+            });
+        });
     </script>
 
 </body>
