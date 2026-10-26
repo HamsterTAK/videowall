@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HamsterTAK Video Monitor Wall</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100%22><text y=%22.9em%22 font-size=%2290%22>🐹</text></svg>">
+    <!-- Load mpegts.js for HTTP-FLV hardware decoding -->
+    <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #0f1115;
+            color: #e0e0e0;
+            font-family: "Segoe UI", Roboto, sans-serif;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        /* 🔐 Tactical Auth Overlay */
+        #auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #090a0f;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+        }
+        .lock-box {
+            background: #181b22;
+            border: 1px solid #2a2e39;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
+            padding: 30px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 360px;
+            width: 90%;
+        }
+        .lock-box h2 {
+            font-size: 16px;
+            color: #00ffcc;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            position: relative;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .lock-input {
+            width: 100%;
+            background: #0f1115;
+            border: 1px solid #3a3f4d;
+            color: #00ffcc;
+            padding: 10px 36px 10px 10px;
+            font-size: 14px;
+            border-radius: 4px;
+            outline: none;
+            text-align: center;
+        }
+        .lock-input:focus {
+            border-color: #00ffcc;
+        }
+        .toggle-eye {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .lock-btn {
+            width: 100%;
+            background: #2a2e39;
+            color: #00ffcc;
+            border: 1px solid #00ffcc;
+            padding: 9px;
+            font-size: 13px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            letter-spacing: 1px;
+        }
+        .lock-btn:hover {
+            background: #00ffcc;
+            color: #000;
+        }
+        .auth-error {
+            color: #ff5555;
+            font-size: 11px;
+            margin-top: 10px;
+            min-height: 16px;
+        }
+
+        /* Main Monitor Content (Hidden by default) */
+        #main-content {
+            display: none;
+        }
+
+        header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2a2e39;
+        }
+        h1 {
+            font-size: 18px;
+            letter-spacing: 1px;
+            color: #00ffcc;
+        }
+        .status {
+            font-size: 11px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .server-box {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #181b22;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #2a2e39;
+        }
+        .server-box code {
+            color: #00ffcc;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        .action-btn {
+            background: #2a2e39;
+            color: #fff;
+            border: none;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .action-btn:hover {
+            background: #00ffcc;
+            color: #000;
+        }
+        .btn-lock {
+            background: #3a2a2e;
+            color: #ffaa88;
+        }
+        .btn-lock:hover {
+            background: #ff6644;
+            color: #fff;
+        }
+        .btn-danger {
+            background: #4a1c24;
+            color: #ff6666;
+            border: 1px solid #6b2631;
+        }
+        .btn-danger:hover {
+            background: #ff3333;
+            color: #fff;
+        }
+        
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            width: 100%;
+        }
+        .grid-item {
+            background: #181b22;
+            border: 1px solid #2a2e39;
+            border-radius: 6px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 300px;
+        }
+
+        .control-bar {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: #21252d;
+            padding: 6px;
+            border-bottom: 1px solid #2a2e39;
+            z-index: 10;
+        }
+        .tag {
+            background: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 3px 6px;
+            font-size: 11px;
+            border-radius: 3px;
+            border-left: 3px solid #00ffcc;
+            white-space: nowrap;
+        }
+        .url-input {
+            flex: 1;
+            min-width: 0;
+            background: #0f1115;
+            border: 1px solid #3a3f4d;
+            color: #00ffcc;
+            padding: 4px 6px;
+            font-size: 11px;
+            border-radius: 3px;
+            outline: none;
+        }
+        .url-input:focus {
+            border-color: #00ffcc;
+        }
+        .btn {
+            background: #2a2e39;
+            color: #fff;
+            border: none;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+        .btn:hover {
+            background: #00ffcc;
+            color: #000;
+        }
+        .btn-clear {
+            background: #3a2a2e;
+            color: #ff8888;
+        }
+        .btn-clear:hover {
+            background: #ff4444;
+            color: #fff;
+        }
+
+        .iframe-wrapper {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .iframe-wrapper iframe,
+        .iframe-wrapper video {
+            width: 100%;
+            height: 100%;
+            border: none;
+            object-fit: contain;
+            background: #000;
+        }
+        .flv-overlay-msg {
+            position: absolute;
+            color: #94a3b8;
+            font-size: 11px;
+            text-align: center;
+            padding: 12px;
+            line-height: 1.5;
+            pointer-events: none;
+            font-family: monospace;
+        }
+
+        @media (max-width: 768px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            .grid-item {
+                height: auto;
+            }
+            .iframe-wrapper {
+                aspect-ratio: 16 / 9;
+                height: auto;
+            }
+            h1 {
+                font-size: 16px;
+            }
+            .tag {
+                font-size: 10px;
+                padding: 2px 4px;
+            }
+            .btn {
+                padding: 4px 6px;
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 🔐 Tactical Auth Overlay -->
+    <div id="auth-overlay">
+        <div class="lock-box">
+            <h2>🐹 HamsterTAK VIDEO WALL</h2>
+            <div class="input-group">
+                <input type="password" id="pass-input" class="lock-input" placeholder="Enter Access Passcode..." autofocus>
+                <button type="button" class="toggle-eye" onclick="togglePassVisibility()" title="Show/Hide Passcode">👁️</button>
+            </div>
+            <button class="lock-btn" onclick="verifyAuth()">UNLOCK CONSOLE</button>
+            <div id="auth-error-msg" class="auth-error"></div>
+        </div>
+    </div>
+
+    <!-- 🖥️ Video Wall Main Content -->
+    <div id="main-content">
+        <header>
+            <h1>HamsterTAK VIDEO MONITOR WALL</h1>
+            <div class="status">
+                <span>WEBRTC + FLV MODE</span>
+                <div class="server-box">
+                    <span>HamsterTAK:</span>
+                    <code id="base-url-text">http://129.225.167.253:8889/</code>
+                    <button class="action-btn" id="copy-btn" onclick="copyBaseUrl()">📋 Copy</button>
+                </div>
+                <button class="action-btn" id="fullscreen-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+                <button class="action-btn btn-lock" onclick="lockConsole()">🔒 Lock</button>
+                <button class="action-btn btn-danger" onclick="clearAllStreams()">🗑️ Clear All</button>
+            </div>
+        </header>
+
+        <div class="grid-container" id="grid-mount"></div>
+    </div>
+
+    <script>
+        // Base64 encoding of hamstervideoilhaformosa
+        const PASS_B64 = "aGFtc3RlcnZpZGVvaWxoYWZvcm1vc2E=";
+        const STORAGE_PREFIX = "htak_cam_url_";
+
+        function togglePassVisibility() {
+            const input = document.getElementById("pass-input");
+            input.type = input.type === "password" ? "text" : "password";
+        }
+
+        function verifyAuth() {
+            const input = document.getElementById("pass-input");
+            const errorMsg = document.getElementById("auth-error-msg");
+            const val = input.value.trim();
+
+            try {
+                if (window.btoa(val) === PASS_B64) {
+                    sessionStorage.setItem("htak_auth", "true");
+                    unlockConsole();
+                    return;
+                }
+            } catch (e) {}
+
+            errorMsg.innerText = "ACCESS DENIED: Invalid Passcode!";
+            input.value = "";
+            input.focus();
+        }
+
+        function unlockConsole() {
+            document.getElementById("auth-overlay").style.display = "none";
+            document.getElementById("main-content").style.display = "block";
+            initGrid();
+        }
+
+        // 1. Lock Console with Confirmation Dialog
+        function lockConsole() {
+            if (confirm("⚠️ Are you sure you want to lock the Video Monitor Wall?\n(Your saved CAM links will be preserved for next unlock.)")) {
+                sessionStorage.removeItem("htak_auth");
+                location.reload();
+            }
+        }
+
+        document.getElementById("pass-input").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") verifyAuth();
+        });
+
+        window.addEventListener("DOMContentLoaded", () => {
+            if (sessionStorage.getItem("htak_auth") === "true") {
+                unlockConsole();
+            }
+        });
+
+        // Dynamically generate 15 monitor windows and restore saved URLs
+        let gridInitialized = false;
+        function initGrid() {
+            if (gridInitialized) return;
+            gridInitialized = true;
+            const container = document.getElementById("grid-mount");
+            let html = "";
+            for (let i = 1; i <= 15; i++) {
+                const padId = String(i).padStart(2, '0');
+                html += `
+                    <div class="grid-item">
+                        <div class="control-bar">
+                            <div class="tag">CAM ${padId}</div>
+                            <input type="text" class="url-input" id="input-${i}" value="" placeholder="Path, Link, FLV, or udp://">
+                            <button class="btn" onclick="updateStream(${i})">Load</button>
+                            <button class="btn btn-clear" onclick="clearStream(${i})">Clear</button>
+                        </div>
+                        <div class="iframe-wrapper" id="wrapper-${i}">
+                            <iframe src="about:blank" allow="autoplay; fullscreen"></iframe>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+
+            // Bind events & restore from localStorage
+            for (let i = 1; i <= 15; i++) {
+                const inputEl = document.getElementById(`input-${i}`);
+                const savedVal = localStorage.getItem(STORAGE_PREFIX + i);
+
+                if (savedVal) {
+                    inputEl.value = savedVal;
+                    updateStream(i);
+                }
+
+                // Auto-save whenever user types or pastes into the input box
+                inputEl.addEventListener('input', function () {
+                    const currentVal = this.value.trim();
+                    if (currentVal) {
+                        localStorage.setItem(STORAGE_PREFIX + i, currentVal);
+                    } else {
+                        localStorage.removeItem(STORAGE_PREFIX + i);
+                    }
+                });
+
+                inputEl.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        updateStream(i);
+                    }
+                });
+            }
+        }
+
+        const DEFAULT_BASE = "http://129.225.167.253:8889/";
+        const flvPlayers = {};
+
+        function destroyFlvPlayer(index) {
+            if (flvPlayers[index]) {
+                try {
+                    flvPlayers[index].pause();
+                    flvPlayers[index].unload();
+                    flvPlayers[index].detachMediaElement();
+                    flvPlayers[index].destroy();
+                } catch (e) {}
+                delete flvPlayers[index];
+            }
+        }
+
+        function copyBaseUrl() {
+            const baseUrl = "http://129.225.167.253:8889/";
+            navigator.clipboard.writeText(baseUrl).then(() => {
+                const btn = document.getElementById("copy-btn");
+                btn.innerText = "✓ Copied!";
+                btn.style.background = "#00ffcc";
+                btn.style.color = "#000";
+                setTimeout(() => {
+                    btn.innerText = "📋 Copy";
+                    btn.style.background = "#2a2e39";
+                    btn.style.color = "#fff";
+                }, 1500);
+            });
+        }
+
+        function toggleFullscreen() {
+            const btn = document.getElementById("fullscreen-btn");
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().then(() => {
+                    btn.innerText = "❌ Exit Fullscreen";
+                }).catch(err => {
+                    alert(`Failed to enter fullscreen mode: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().then(() => {
+                        btn.innerText = "⛶ Fullscreen";
+                    });
+                }
+            }
+        }
+
+        document.addEventListener("fullscreenchange", () => {
+            const btn = document.getElementById("fullscreen-btn");
+            if (!document.fullscreenElement) {
+                btn.innerText = "⛶ Fullscreen";
+            } else {
+                btn.innerText = "❌ Exit Fullscreen";
+            }
+        });
+
+        function updateStream(index) {
+            const input = document.getElementById(`input-${index}`);
+            const wrapper = document.getElementById(`wrapper-${index}`);
+            let val = input.value.trim();
+
+            // 2. Save or remove URL in localStorage
+            if (val) {
+                localStorage.setItem(STORAGE_PREFIX + index, val);
+            } else {
+                localStorage.removeItem(STORAGE_PREFIX + index);
+            }
+
+            destroyFlvPlayer(index);
+            wrapper.innerHTML = '';
+
+            if (!val) {
+                wrapper.innerHTML = `<iframe src="about:blank" allow="autoplay; fullscreen"></iframe>`;
+                return;
+            }
+
+            let targetUrl = "";
+            if (/^https?:\/\//i.test(val)) {
+                targetUrl = val.replace(/^https?:\/\//i, m => m.toLowerCase());
+            } else if (/^(udp|rtsp|rtmp):\/\//i.test(val)) {
+                const encodedSource = encodeURIComponent(val);
+                targetUrl = DEFAULT_BASE + encodedSource;
+            } else {
+                const cleanPath = val.replace(/^\/+/, '');
+                targetUrl = DEFAULT_BASE + cleanPath;
+            }
+
+            const isFlvStream = /\/flv\/|\.flv($|\?)/i.test(targetUrl);
+
+            setTimeout(() => {
+                if (isFlvStream) {
+                    wrapper.innerHTML = `
+                        <video id="video-${index}" autoplay muted controls playsinline></video>
+                        <div class="flv-overlay-msg" id="msg-${index}">⏳ Decoding FLV...</div>
+                    `;
+                    const videoEl = document.getElementById(`video-${index}`);
+                    const msgEl = document.getElementById(`msg-${index}`);
+
+                    if (window.mpegts && mpegts.isSupported()) {
+                        const player = mpegts.createPlayer(
+                            { type: 'flv', isLive: true, hasAudio: false, url: targetUrl },
+                            { enableWorker: true, enableStashBuffer: false, stashInitialSize: 128 }
+                        );
+                        flvPlayers[index] = player;
+                        player.attachMediaElement(videoEl);
+                        player.load();
+                        player.play().then(() => {
+                            if (msgEl) msgEl.style.display = 'none';
+                        }).catch(() => {
+                            if (msgEl) msgEl.innerText = '▶️ Click video to start playback';
+                        });
+                        videoEl.addEventListener('playing', () => {
+                            if (msgEl) msgEl.style.display = 'none';
+                        });
+                        player.on(mpegts.Events.ERROR, (errType) => {
+                            if (msgEl) {
+                                msgEl.style.display = 'block';
+                                msgEl.innerHTML = `⚠️ FLV Stream Offline or Blocked by CORS (${errType})`;
+                            }
+                        });
+                    } else if (msgEl) {
+                        msgEl.innerText = '❌ Browser does not support MSE/FLV decoding';
+                    }
+                } else {
+                    wrapper.innerHTML = `<iframe src="${targetUrl}" allow="autoplay; fullscreen"></iframe>`;
+                }
+            }, 100);
+        }
+
+        // Single CAM Clear (also clears saved localStorage for this CAM)
+        function clearStream(index) {
+            const input = document.getElementById(`input-${index}`);
+            input.value = "";
+            localStorage.removeItem(STORAGE_PREFIX + index);
+            updateStream(index);
+        }
+
+        // 3. Clear All Streams with Confirmation Dialog
+        function clearAllStreams() {
+            if (confirm("⚠️ Are you sure you want to CLEAR ALL 15 camera streams?\nThis will remove all saved links and stop all active feeds.")) {
+                for (let i = 1; i <= 15; i++) {
+                    clearStream(i);
+                }
+            }
+        }
+    </script>
+
+</body>
+</html>
